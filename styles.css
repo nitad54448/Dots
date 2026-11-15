@@ -258,6 +258,12 @@ button {
   border-color: transparent;
 }
 
+@media (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
+  #hub-btn-install {
+    display: none !important;
+  }
+}
+
 @media (max-width: 459px) {
   .hub-utils {
     width: 100%;

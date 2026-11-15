@@ -770,6 +770,87 @@
     updateSoundButtons(next.sound);
   }
 
+  function isStandaloneApp() {
+    const modes = ['standalone', 'fullscreen', 'minimal-ui', 'window-controls-overlay'];
+    if (typeof global.matchMedia === 'function') {
+      for (let i = 0; i < modes.length; i++) {
+        try {
+          if (global.matchMedia('(display-mode: ' + modes[i] + ')').matches) {
+            return true;
+          }
+        } catch (_) {}
+      }
+    }
+    if (global.navigator && global.navigator.standalone === true) {
+      return true;
+    }
+    if (document.referrer && document.referrer.indexOf('android-app://') === 0) {
+      return true;
+    }
+    return false;
+  }
+
+  function removeInstallButton() {
+    deferredInstallPrompt = null;
+    const btn = $('hub-btn-install');
+    if (btn) btn.remove();
+  }
+
+  function setupAppInstall() {
+    if (isStandaloneApp()) {
+      removeInstallButton();
+      return;
+    }
+
+    if (typeof global.matchMedia === 'function') {
+      try {
+        const mq = global.matchMedia('(display-mode: standalone)');
+        const onDisplayModeChange = (ev) => {
+          if (ev.matches || isStandaloneApp()) {
+            removeInstallButton();
+          }
+        };
+        if (typeof mq.addEventListener === 'function') {
+          mq.addEventListener('change', onDisplayModeChange);
+        } else if (typeof mq.addListener === 'function') {
+          mq.addListener(onDisplayModeChange);
+        }
+      } catch (_) {}
+    }
+
+    global.addEventListener('beforeinstallprompt', (e) => {
+      if (isStandaloneApp()) return;
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      const btn = $('hub-btn-install');
+      if (btn) btn.classList.remove('hidden');
+    });
+
+    const installBtn = $('hub-btn-install');
+    if (installBtn) {
+      installBtn.addEventListener('click', async () => {
+        if (!deferredInstallPrompt) return;
+        deferredInstallPrompt.prompt();
+        let outcome = 'dismissed';
+        try {
+          const choice = await deferredInstallPrompt.userChoice;
+          if (choice && choice.outcome) outcome = choice.outcome;
+        } catch (_) {}
+        deferredInstallPrompt = null;
+        if (outcome === 'accepted') {
+          removeInstallButton();
+        } else {
+          const btn = $('hub-btn-install');
+          if (btn) btn.classList.add('hidden');
+        }
+      });
+    }
+
+    global.addEventListener('appinstalled', () => {
+      removeInstallButton();
+    });
+  }
+
   function bindUIEvents() {
     $('hub-btn-themes').addEventListener('click', () => {
       renderThemesModal();
@@ -969,21 +1050,7 @@
       }
     });
 
-    global.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredInstallPrompt = e;
-      $('hub-btn-install').classList.remove('hidden');
-    });
-
-    $('hub-btn-install').addEventListener('click', async () => {
-      if (!deferredInstallPrompt) return;
-      deferredInstallPrompt.prompt();
-      try {
-        await deferredInstallPrompt.userChoice;
-      } catch (_) {}
-      deferredInstallPrompt = null;
-      $('hub-btn-install').classList.add('hidden');
-    });
+    setupAppInstall();
   }
 
   function registerServiceWorker() {

@@ -239,21 +239,30 @@
     }
     if (bridges.length < numBridges) return null;
 
-    // Place walls away from bridge 4-neighbors
+    // Place walls away from corners, bridge 4-neighbors, and 8-adjacent wall clusters
     let wTries = 0;
-    while (walls.length < numWalls && wTries++ < 90) {
+    while (walls.length < numWalls && wTries++ < 120) {
       const r = (rng() * N) | 0;
       const c = (rng() * N) | 0;
+      if ((r === 0 || r === N - 1) && (c === 0 || c === N - 1)) continue;
       const idx = r * N + c;
       if (cellType[idx] !== 0) continue;
-      let nearBridge = false;
+      let blocked = false;
       for (let i = 0; i < bridges.length; i++) {
         if (Math.abs(bridges[i].r - r) + Math.abs(bridges[i].c - c) <= 1) {
-          nearBridge = true;
+          blocked = true;
           break;
         }
       }
-      if (!nearBridge) {
+      if (!blocked) {
+        for (let i = 0; i < walls.length; i++) {
+          if (Math.abs(walls[i].r - r) <= 1 && Math.abs(walls[i].c - c) <= 1) {
+            blocked = true;
+            break;
+          }
+        }
+      }
+      if (!blocked) {
         cellType[idx] = 1;
         walls.push({ r, c, idx });
       }
@@ -272,7 +281,7 @@
     let filledSlots = 0;
     const paths = [];
     let steps = 0;
-    const maxSteps = N >= 15 ? 4500 : 3200;
+    const maxSteps = N >= 17 ? 1100 : N >= 13 ? 900 : 750;
 
     function isNormalEmpty(idx) {
       return cellType[idx] === 0 && grid[idx] === -1;
@@ -431,7 +440,7 @@
           const nxt = nr * N + nc;
           if (cellType[nxt] === 2) {
             const exitIdx = (nr + dr) * N + (nc + dc);
-            if (!violatesChordless(cur, exitIdx, -1)) {
+            if (bridgeH[nxt] !== pId && bridgeV[nxt] !== pId && !violatesChordless(cur, exitIdx, -1)) {
               cands.push({ bridge: nxt, next: exitIdx, vertical: dr !== 0 });
             }
           } else {
@@ -499,7 +508,7 @@
       return false;
     }
 
-    if (!solve()) return null;
+    if (!validBoard() || !solve()) return null;
     return {
       paths,
       walls: walls.map((w) => ({ r: w.r, c: w.c })),
@@ -580,14 +589,14 @@
 
     const maxCandidates =
       params.size <= 9 && params.numWalls === 0 && params.numBridges === 0 ? 2 : 1;
-    const maxAttempts = 65;
+    const maxAttempts = 180;
     const candidates = [];
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const activeBridges =
-        params.numBridges > 1 && attempt >= 45 ? params.numBridges - 1 : params.numBridges;
+        params.numBridges > 1 && attempt >= 120 ? params.numBridges - 1 : params.numBridges;
       const activeWalls =
-        params.numWalls > 2 && attempt >= 45 ? params.numWalls - 1 : params.numWalls;
+        params.numWalls > 2 && attempt >= 120 ? params.numWalls - 1 : params.numWalls;
       const sol = solveChordlessAttempt(
         params.size,
         params.minP,

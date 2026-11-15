@@ -101,15 +101,18 @@
 
     if (
       savedState &&
-      Array.isArray(savedState.paths) &&
-      savedState.paths.length === level.numPairs
+      isValidSavedPaths(level, savedState.paths)
     ) {
       paths = savedState.paths.map((p) =>
         Array.isArray(p) ? p.map((pt) => ({ r: pt.r, c: pt.c })) : []
       );
       moves = Number(savedState.moves) || 0;
       if (Array.isArray(savedState.hintedColors)) {
-        savedState.hintedColors.forEach((c) => hintedColors.add(c));
+        savedState.hintedColors.forEach((c) => {
+          if (Number.isInteger(c) && c >= 0 && c < level.numPairs && pathMatchesSolution(c)) {
+            hintedColors.add(c);
+          }
+        });
       }
     } else {
       paths = Array.from({ length: level.numPairs }, () => []);
@@ -122,13 +125,47 @@
     render();
   }
 
-  function serializePaths(srcPaths) {
-    return JSON.stringify(srcPaths || paths);
+  function isValidSavedPaths(lvl, savedPaths) {
+    if (!lvl || !Array.isArray(savedPaths) || savedPaths.length !== lvl.numPairs) {
+      return false;
+    }
+    const N = lvl.size;
+    for (let i = 0; i < lvl.numPairs; i++) {
+      const p = savedPaths[i];
+      if (!Array.isArray(p)) return false;
+      if (p.length === 0) continue;
+      const ep = lvl.endpoints[i];
+      for (let j = 0; j < p.length; j++) {
+        const pt = p[j];
+        if (!pt || !Number.isInteger(pt.r) || !Number.isInteger(pt.c)) return false;
+        if (pt.r < 0 || pt.r >= N || pt.c < 0 || pt.c >= N) return false;
+        if (wallSet.has(pt.r * N + pt.c)) return false;
+        if (j === 0 && !sameCell(pt, ep.start) && !sameCell(pt, ep.end)) return false;
+        if (j > 0) {
+          const prev = p[j - 1];
+          if (Math.abs(pt.r - prev.r) + Math.abs(pt.c - prev.c) !== 1) return false;
+        }
+      }
+    }
+    return true;
   }
 
-  function restorePaths(serialized) {
+  function serializeSnapshot() {
+    return JSON.stringify({
+      paths: paths,
+      hinted: Array.from(hintedColors)
+    });
+  }
+
+  function restoreSnapshot(serialized) {
     const parsed = JSON.parse(serialized);
-    paths = parsed.map((p) => p.map((pt) => ({ r: pt.r, c: pt.c })));
+    if (Array.isArray(parsed)) {
+      paths = parsed.map((p) => p.map((pt) => ({ r: pt.r, c: pt.c })));
+      hintedColors.clear();
+      return;
+    }
+    paths = (parsed.paths || []).map((p) => p.map((pt) => ({ r: pt.r, c: pt.c })));
+    hintedColors = new Set(Array.isArray(parsed.hinted) ? parsed.hinted : []);
   }
 
   function pushUndo(snapshot) {
@@ -187,6 +224,22 @@
     return hits;
   }
 
+  function pickTopPipeHit(r, c) {
+    const hits = findPipesAt(r, c);
+    if (hits.length === 0) return null;
+    if (hits.length === 1 || !isBridgeAt(r, c)) return hits[0];
+    for (let i = 0; i < hits.length; i++) {
+      const h = hits[i];
+      const op = paths[h.color];
+      const j = h.index;
+      const isHoriz =
+        (j > 0 && op[j].r === op[j - 1].r) ||
+        (j + 1 < op.length && op[j].r === op[j + 1].r);
+      if (isHoriz) return h;
+    }
+    return hits[0];
+  }
+
   function clientToCell(clientX, clientY, clampForDrag) {
     if (!canvas || !level) return null;
     const rect = canvas.getBoundingClientRect();
@@ -224,11 +277,11 @@
 
     let targetColor = getEndpointColorAt(cell.r, cell.c);
     if (targetColor === -1) {
-      const hits = findPipesAt(cell.r, cell.c);
-      if (hits.length === 1) targetColor = hits[0].color;
+      const hit = pickTopPipeHit(cell.r, cell.c);
+      if (hit) targetColor = hit.color;
     }
     if (targetColor !== -1 && paths[targetColor] && paths[targetColor].length > 0) {
-      pushUndo(serializePaths(paths));
+      pushUndo(serializeSnapshot());
       paths[targetColor] = [];
       hintedColors.delete(targetColor);
       lastMovedColor = -1;
@@ -248,7 +301,7 @@
 
     const epColor = getEndpointColorAt(cell.r, cell.c);
     if (epColor !== -1) {
-      preDragSnapshot = serializePaths(paths);
+      preDragSnapshot = serializeSnapshot();
       hintedColors.delete(epColor);
       activeColor = epColor;
       paths[epColor] = [{ r: cell.r, c: cell.c }];
@@ -262,10 +315,9 @@
       return;
     }
 
-    const hits = findPipesAt(cell.r, cell.c);
-    if (hits.length === 1) {
-      const hit = hits[0];
-      preDragSnapshot = serializePaths(paths);
+    const hit = pickTopPipeHit(cell.r, cell.c);
+    if (hit) {
+      preDragSnapshot = serializeSnapshot();
       hintedColors.delete(hit.color);
       activeColor = hit.color;
       paths[hit.color] = paths[hit.color].slice(0, hit.index + 1);
@@ -315,16 +367,29 @@
       return false;
     }
 
+    const stepVert = nr !== head.r;
+
     // Backtrack if stepping onto an earlier cell of the active path
+    // (unless crossing perpendicularly across a bridge cell)
     for (let i = 0; i < curPath.length; i++) {
       if (curPath[i].r === nr && curPath[i].c === nc) {
+        if (isBridgeAt(nr, nc) && i < curPath.length - 2) {
+          const earlierVert =
+            i > 0
+              ? curPath[i].r !== curPath[i - 1].r
+              : i + 1 < curPath.length
+                ? curPath[i + 1].r !== curPath[i].r
+                : stepVert;
+          if (earlierVert !== stepVert) {
+            continue;
+          }
+        }
         curPath.length = i + 1;
         if (global.DotsAudio) global.DotsAudio.playStep(curPath.length);
         return true;
       }
     }
 
-    const stepVert = nr !== head.r;
     const hits = findPipesAt(nr, nc);
     let didCut = false;
 
@@ -449,7 +514,7 @@
       paths[activeColor] = [];
     }
 
-    const afterSnapshot = serializePaths(paths);
+    const afterSnapshot = serializeSnapshot();
     if (preDragSnapshot !== null && afterSnapshot !== preDragSnapshot) {
       pushUndo(preDragSnapshot);
       if (activeColor !== -1 && paths[activeColor] && paths[activeColor].length >= 2) {
@@ -585,7 +650,7 @@
   function undo() {
     if (won || undoStack.length === 0) return false;
     const prev = undoStack.pop();
-    restorePaths(prev);
+    restoreSnapshot(prev);
     lastMovedColor = -1;
     if (global.DotsAudio) global.DotsAudio.playUndo();
     emitStats();
@@ -597,7 +662,7 @@
     if (!level) return;
     const hasAny = paths.some((p) => p.length > 0);
     if (hasAny && !won) {
-      pushUndo(serializePaths(paths));
+      pushUndo(serializeSnapshot());
     }
     paths = Array.from({ length: level.numPairs }, () => []);
     moves = 0;
@@ -644,7 +709,7 @@
 
     if (targetColor === -1) return { applied: false };
 
-    pushUndo(serializePaths(paths));
+    pushUndo(serializeSnapshot());
 
     const N = level.size;
     const sol = level.solutionPaths[targetColor];

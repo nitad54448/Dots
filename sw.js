@@ -1,10 +1,12 @@
-const CACHE_NAME = 'connect-dots-v4';
+const CACHE_NAME = 'connect-dots-v6';
 const CORE_ASSETS = [
   './',
   './index.html',
   './styles.css',
   './manifest.json',
   './icon.svg',
+  './icon-192.png',
+  './icon-512.png',
   './js/storage.js',
   './js/audio.js',
   './js/themes.js',

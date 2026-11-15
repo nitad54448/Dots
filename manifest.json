@@ -1,19 +1,37 @@
 {
   "name": "Connect the Dots - Color Line",
   "short_name": "Connect Dots",
-  "description": "Connect matching colored dots with continuous pipes to fill the entire grid without crossing paths. 10,000+ levels across 5 difficulties, Daily Puzzle & Time Rush.",
+  "description": "Connect matching colored dots with continuous pipes to fill the entire grid without crossing paths. 35,000+ levels across 7 campaign modes, Daily Puzzle & Time Rush.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
+  "background_color": "#070b14",
+  "theme_color": "#070b14",
   "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
     {
       "src": "./icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }

@@ -779,7 +779,7 @@
 
     if (skin === 'neon') {
       ctx.shadowColor = color.hex;
-      ctx.shadowBlur = Math.min(10, Math.max(2, cellSize * 0.2));
+      ctx.shadowBlur = Math.min(5, Math.max(1, cellSize * 0.1));
       ctx.strokeStyle = color.hex;
       ctx.lineWidth = pipeWidth;
       ctx.stroke();
@@ -926,7 +926,7 @@
     }
 
     // Draw Base Pipes (underpass pass)
-    const pipeWidth = Math.max(3, cellSize * (skin === 'minimal' ? 0.26 : 0.4));
+    const pipeWidth = Math.max(1.5, cellSize * (skin === 'minimal' ? 0.13 : 0.2));
     for (let c = 0; c < level.numPairs; c++) {
       const p = paths[c];
       if (!p || p.length < 2) continue;

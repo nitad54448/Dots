@@ -98,7 +98,7 @@
       ctx.save();
       ctx.strokeStyle = '#ffffff';
       ctx.globalAlpha = alpha;
-      ctx.lineWidth = Math.max(4, cellSize * 0.22);
+      ctx.lineWidth = Math.max(2, cellSize * 0.11);
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.beginPath();
